@@ -7,7 +7,7 @@
 ## Git / GitHub policy
 
 - **No automatic pushes** to GitHub from the AI assistant.
-- **No commits** made on Rich’s behalf for routine work — keeps his [GitHub contribution graph](https://github.com/t4thick) clean (only his commits show up).
+- **No commits** made on Rich’s behalf for routine work — keeps his [GitHub contribution graph](https://github.com/richardeyeboah) clean (only his commits show up).
 - When ready to save: Rich runs `git add`, `git commit`, and `git push` himself, **or** explicitly asks the assistant to commit with a message he approves.
 - Code lives locally + Vercel deploy until he chooses to push.
 
@@ -131,7 +131,7 @@ TODO  PWA custom icons + Capacitor wrap for App Store
 ## Live URLs (no GitHub yet)
 
 - **App:** https://prince-inventory-manager.vercel.app
-- **Repo (local only until push):** `t4thick/prince-inventory-manager`
+- **Repo (local only until push):** `richardeyeboah/prince-inventory-manager`
 
 ---
 
