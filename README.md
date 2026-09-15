@@ -1,67 +1,77 @@
-# Prince Auto
+# Prince Auto Inventory & POS
 
-Inventory + checkout for Prince's mechanic shop — shared across workers on phone and desktop.
+Mobile-first inventory, checkout, and customer-credit system for Prince Auto. The application gives owners and workers a shared view of parts, jobs, payments, and stock on phones and desktops.
 
-## Run locally
+- Live app: [prince-inventory-manager.vercel.app](https://prince-inventory-manager.vercel.app)
+- Stack: React 19, TypeScript, Vite, Supabase/PostgreSQL, Vitest, Progressive Web App
+
+## What the application does
+
+- Tracks parts, cost, selling price, quantity, and low-stock items
+- Creates sales with parts, labor, customer, vehicle, notes, and payment method
+- Prints receipts and keeps job history with the responsible worker
+- Supports paid, partial-payment, and pay-later sales
+- Shows customer balances and payment history
+- Calculates sales, tax, cost, and gross profit reports
+- Queues sales during a connection loss and syncs them after reconnection
+- Lets owners manage worker accounts and void sales; voids restore stock and keep an audit record
+
+## Data integrity and access control
+
+Supabase Auth identifies each user as an owner or worker. PostgreSQL row-level security limits access, while database functions perform sensitive operations.
+
+Sale finalization runs as one database operation: it validates stock, records immutable line-item and cost snapshots, updates inventory, and writes financial records. Client-generated operation IDs make retries idempotent, so an interrupted offline sync cannot create the same sale twice.
+
+## Local development
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-Copy `.env.example` to `.env.local` and add your Supabase URL + publishable key.
+Add the Supabase project URL and publishable key to `.env.local`.
 
 ## Database setup
 
-Run the SQL files in **Supabase → SQL Editor** (in order):
-
-1. `supabase/migrations/20250824000000_initial_schema.sql`
-2. `supabase/migrations/20250826000000_phase1_auth.sql`
-3. `supabase/migrations/20260903000000_finance_credit.sql`
-
-Or after `npx supabase login` and `npx supabase link`:
+Apply the SQL files in `supabase/migrations/` in filename order, or link a Supabase project and run:
 
 ```bash
+npx supabase login
+npx supabase link
 npm run db:push
 ```
 
-## First login
+The first account becomes the owner. Later accounts become workers and can be managed from the Team screen.
 
-1. Open the app and tap **Join shop** (or Sign in after signup).
-2. The **first account** becomes **owner** (can add/edit parts, void any job).
-3. Later accounts are **workers** (checkout, adjust stock, void own jobs).
+## Verification
 
-In Supabase → **Authentication → Providers**, enable Email. For a small internal team, you may disable **Confirm email** so workers can sign in immediately.
+```bash
+npm test
+npm run lint
+npm run build
+```
 
-## Live site
+The test suite covers shop summaries, profit calculations, worker checkout access, offline synchronization, and inventory behavior.
 
-https://prince-inventory-manager.vercel.app
+## Install on a phone
 
-## Features
+On iPhone, open the live app in Safari, tap **Share**, then **Add to Home Screen**. Android browsers provide the equivalent install option. The installed PWA opens full-screen and can queue sales while offline.
 
-- **Checkout** — parts & labor, cash/card/transfer, customer & vehicle on ticket
-- **Receipt** — print-friendly summary after payment
-- **Parts** — shared stock, low-stock alerts; owner manages catalog
-- **Jobs** — history with worker name; void restores stock
-- **Auth** — owner vs worker roles, secure database rules
-- **PWA** — Add to Home Screen on iPhone/Android (standalone app feel)
-- **Offline** — sales queue locally when connection drops, sync when back
-- **Tax & profit** — optional 20% item tax, cost snapshots, per-sale and period profit
-- **Customer credit** — pay later, partial payments, searchable balances and payment history
-
-## iPhone (PWA + optional Xcode wrapper)
-
-**Fastest:** Safari → [prince-inventory-manager.vercel.app](https://prince-inventory-manager.vercel.app) → Share → **Add to Home Screen**. The app opens full-screen like a native app.
-
-Safari visitors see an in-app install guide. Full steps: [`docs/IPHONE.md`](docs/IPHONE.md).
-
-**Xcode wrapper (optional):** Capacitor is configured (`capacitor.config.ts`). On a Mac with Xcode and CocoaPods:
+An optional Capacitor wrapper is also configured:
 
 ```bash
 npm run ios:sync
 npm run ios:open
 ```
 
-## Native Swift vs this app
+See [`docs/IPHONE.md`](docs/IPHONE.md) for the full iPhone setup guide.
 
-A full Swift/SwiftUI rebuild would be a separate project. This codebase is React + Supabase + PWA — suitable for your shop today and expandable (suppliers, POs, barcode via camera, etc.) without rewriting in Swift.
+## Repository layout
+
+- `src/components/` — checkout, inventory, sales, reports, credit, and team screens
+- `src/lib/` — calculations, summaries, offline queue, and tests
+- `supabase/migrations/` — schema, access policies, and transactional functions
+- `docs/` — operating and installation notes
+
+Credentials belong in `.env.local` and the deployment environment. Do not commit customer data or service keys.
