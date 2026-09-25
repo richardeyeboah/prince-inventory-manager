@@ -46,7 +46,23 @@ export type SaleLine = {
   grossProfit: number
 }
 
+export type VoidReceipt = {
+  receipt_number: string
+  created_at: string
+  recorded_by: string
+  recorded_by_name: string
+  reason: string
+  refund_amount: number
+  payment_method: CollectedPaymentMethod
+  original_sale: {
+    items: SaleLine[]; total: number; amount_paid: number; balance_due: number
+  }
+}
+
 export type Sale = {
+  voidReceipt?: VoidReceipt | null
+  resetId?: string | null
+  adjustmentVersion?: number
   id: string
   receiptNumber: string
   items: SaleLine[]
@@ -113,3 +129,29 @@ export type Payment = {
   createdAt: string
   reversedAt: string | null
 }
+
+export type SaleAdjustment = {
+  id: string
+  sale_id: string
+  created_at: string
+  recorded_by: string
+  reason: string
+  restocked: number
+  refund_amount: number
+  payment_method: CollectedPaymentMethod
+  before_sale: { total: number }
+  after_sale: { total: number }
+}
+export type AdjustmentInput = {
+  id: string
+  saleId: string
+  version: number
+  lineNumber: number
+  quantity: number
+  unitPrice: number
+  restock: boolean
+  reason: string
+  method: CollectedPaymentMethod
+}
+
+export type SalesReset = { id: string; created_at: string; reason: string; sale_count: number; sales_total: number; restored_at: string | null }

@@ -51,7 +51,7 @@ const mobileNavItems: { id: Tab; label: string; icon: typeof Wrench }[] = [
 function Shell() {
   const [requestedTab, setTab] = useState<Tab>('dashboard')
   const { profile, signOut, isOwner } = useAuth()
-  const workerTabs: Tab[] = ['dashboard', 'sell', 'credit']
+  const workerTabs: Tab[] = ['dashboard', 'sell', 'credit', 'sales']
   const tab = isOwner || workerTabs.includes(requestedTab) ? requestedTab : 'dashboard'
   const mobileTab = tab === 'reports' || tab === 'team' ? 'more' : tab
   const [showInstall, setShowInstall] = useState(shouldShowInstallPrompt)

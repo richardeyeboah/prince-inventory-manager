@@ -162,6 +162,7 @@ export function ReportsView() {
         <div>
           <p className="eyebrow">Numbers</p>
           <h1>Reports</h1>
+          <p>Sales reflect returns and corrections on the original sale date. Collected includes refunds on the day recorded.</p>
         </div>
         {isOwner && report.inRange.length > 0 && (
           <button type="button" className="primary-btn" onClick={exportCsv}>

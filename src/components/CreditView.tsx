@@ -7,7 +7,7 @@ import { ModalPortal } from './ModalPortal'
 import { StoreContact } from './StoreContact'
 
 export function CreditView() {
-  const { sales, payments, recordPayment } = useShop()
+  const { allSales: sales, allPayments: payments, recordPayment } = useShop()
   const [query, setQuery] = useState('')
   const [selected, setSelected] = useState<Sale | null>(null)
   const [amount, setAmount] = useState('')
@@ -284,7 +284,7 @@ export function CreditView() {
                 <><h3>Payments received</h3><ul className="statement-payment-list">
                   {statementPayments.map((payment) => <li key={payment.id}>
                     <span>{new Date(payment.createdAt).toLocaleDateString()} · {payment.paymentMethod}</span>
-                    <strong>{money(payment.amount)}</strong>
+                    <strong>{payment.amount < 0 ? 'Refund ' : ''}{money(payment.amount)}</strong>
                   </li>)}
                 </ul></>
               )}

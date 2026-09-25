@@ -7,12 +7,12 @@ import { useAuth } from '../auth'
 type Props = { onNavigate: (tab: 'sell' | 'stock' | 'sales' | 'credit') => void }
 
 export function DashboardView({ onNavigate }: Props) {
-  const { products, sales, payments, isOwner, offlinePending } = useShop()
+  const { products, sales, allSales, payments, isOwner, offlinePending } = useShop()
   const { profile } = useAuth()
   const visibleSales = isOwner ? sales : sales.filter((sale) => sale.workerId === profile?.id)
   const visiblePayments = isOwner ? payments : payments.filter((payment) => payment.recordedBy === profile?.id)
   const data = summarizeStore(products, visibleSales, visiblePayments)
-  const sharedBalance = sales.filter((sale) => !sale.voidedAt).reduce((sum, sale) => sum + sale.balanceDue, 0)
+  const sharedBalance = allSales.filter((sale) => !sale.voidedAt).reduce((sum, sale) => sum + sale.balanceDue, 0)
   const max = Math.max(1, ...data.series.map((day) => day.total))
   return <div className="view dashboard-view">
     <header className="view-header">

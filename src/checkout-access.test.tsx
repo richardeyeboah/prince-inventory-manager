@@ -16,6 +16,8 @@ vi.mock('./components/PwaUpdatePrompt', () => ({ PwaUpdatePrompt: () => null }))
 import App from './App'
 import { ShopProvider, useShop } from './store'
 import { SellView } from './components/SellView'
+import { SalesView } from './components/SalesView'
+import { TestJob } from './components/TestJob'
 import { TeamView } from './components/TeamView'
 
 const captureShop = vi.fn<(value: ReturnType<typeof useShop>) => void>()
@@ -32,7 +34,7 @@ beforeEach(() => {
   rpc.mockReset()
 })
 
-describe('checkout-only worker access', () => {
+describe('worker access', () => {
   it('provides sign-in without public account creation', () => {
     auth.session = null
     const html = renderToStaticMarkup(<App />)
@@ -40,16 +42,24 @@ describe('checkout-only worker access', () => {
     expect(html).not.toContain('Join shop')
     expect(html).not.toContain('Create account')
   })
+  it('only offers receipt testing to the owner', () => {
+    expect(renderToStaticMarkup(<ShopProvider><SalesView /></ShopProvider>)).not.toContain('Test job')
+    expect(renderToStaticMarkup(<ShopProvider><TestJob onClose={() => {}} /></ShopProvider>)).toBe('')
+    auth.isOwner = true; auth.profile!.role = 'owner'
+    expect(renderToStaticMarkup(<ShopProvider><SalesView /></ShopProvider>)).toContain('Test job')
+    expect(rpc).not.toHaveBeenCalled()
+  })
   it('blocks the staff management view for workers', () => {
     expect(renderToStaticMarkup(<TeamView />)).toBe('')
   })
 
-  it('shows the worker dashboard, checkout and balances navigation', () => {
+  it('shows the worker dashboard, checkout, balances and sales navigation', () => {
     const html = renderToStaticMarkup(<App />)
     expect(html).toContain('Checkout')
     expect(html).toContain('Dashboard')
     expect(html).toContain('Balances')
-    for (const label of ['>Products<', '>Sales<', '>Reports<', '>More<', '>Staff access<']) {
+    expect(html).toContain('>Sales<')
+    for (const label of ['>Products<', '>Reports<', '>More<', '>Staff access<']) {
       expect(html).not.toContain(label)
     }
   })
@@ -72,7 +82,9 @@ describe('checkout-only worker access', () => {
     value.adjustStock('p', 1)
     value.deleteProduct('p')
     value.updateProduct('p', { price: 1 })
-    expect(await value.voidSale('s')).toBe(false)
+    expect(await value.voidSale('s', 'Test void', 'cash', 0)).toBe(false)
+    expect(await value.resetSales('r',null,null,'test',[])).toBe(false)
+    expect(await value.restoreReset('r')).toBe(false)
     expect(rpc).not.toHaveBeenCalled()
   })
   it('rejects removed payment methods before submitting a sale', async () => {

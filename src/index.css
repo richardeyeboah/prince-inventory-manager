@@ -3124,3 +3124,41 @@ button.kpi-card:focus-visible { outline: 3px solid color-mix(in srgb, var(--acce
 @media print {
   #print-receipt { width: 320px; max-width: 100%; margin-inline: auto; padding: 0.65rem; }
 }
+
+.return-form { margin: 16px 0; padding: 16px; border: 1px solid var(--border, #d6d6d6); border-radius: 12px; }
+.return-form fieldset { border: 0; padding: 0; display: grid; gap: 12px; min-width: 0; }
+.return-form label { display: grid; gap: 5px; }
+.return-form input, .return-form select { padding: 10px; max-width: 100%; }
+.return-form input[type=checkbox] { width: 20px; height: 20px; }
+
+.receipt-voided { border: 3px solid currentColor; padding: 12px 6px; text-align: center; font-size: 1.15rem; font-weight: 900; letter-spacing: .08em; color: #111; break-inside: avoid; }
+.void-audit dd { overflow-wrap: anywhere; white-space: pre-wrap; }
+.receipt-logo { display: block; width: 100%; height: auto; object-fit: contain; }
+.receipt-details { display: grid; gap: .55rem; font-size: .85rem; }
+.receipt-details > div { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr); gap: .7rem; }
+.receipt-details dt { color: #555; }
+.receipt-details dd { margin: 0; overflow-wrap: anywhere; }
+.receipt-column-head { display: flex; justify-content: space-between; gap: 1rem; font-size: .75rem; }
+
+/* Sales history calendar and isolated receipt testing. */
+.sales-calendar { padding: 1rem; margin: 1rem 0 1.5rem; max-width: 680px; }
+.calendar-toolbar { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.calendar-month { flex: 1; display: grid; gap: .25rem; font-size: .75rem; min-width: 130px; }
+.calendar-month input, .sales-history-filter select, .test-job-controls select { padding: .65rem; border: 1px solid var(--border, #ddd); border-radius: 8px; color: inherit; background: var(--surface, #fff); max-width: 100%; }
+.calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: .35rem; }
+.calendar-weekday { text-align: center; font-size: .7rem; color: var(--muted); padding: .35rem 0; }
+.calendar-day { display: grid; justify-items: center; gap: .25rem; min-height: 58px; padding: .45rem .1rem; background: transparent; border: 1px solid var(--border, #ddd); border-radius: 9px; color: inherit; cursor: pointer; font: inherit; }
+.calendar-day small { font-size: .62rem; color: var(--muted); }
+.calendar-day.is-today { border: 2px solid #247b62; }
+.calendar-day[aria-pressed=true] { background: #1c493e; color: white; border-color: #1c493e; }
+.calendar-day[aria-pressed=true] small { color: #d2e7df; }
+.calendar-day:focus-visible { outline: 3px solid #c18423; outline-offset: 2px; }
+.calendar-hint { font-size: .8rem; color: var(--muted); line-height: 1.5; margin: .8rem 0 0; }
+.sales-history-filter { display: grid; gap: .35rem; max-width: 420px; font-size: .85rem; }
+.daily-sales-summary { display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; margin: .8rem 0 1rem; font-size: .9rem; }
+.test-job-controls { padding: 0 0 1rem; }
+.test-job-controls label { display: grid; gap: .4rem; }
+.test-job-controls p { font-size: .85rem; line-height: 1.5; color: var(--muted); }
+.receipt-test-banner { border: 2px dashed currentColor; padding: .7rem; text-align: center; font-weight: 800; font-size: .8rem; color: #111; break-inside: avoid; }
+.receipt-preview-modal { grid-template-rows: auto auto minmax(0, 1fr) auto; }
+.receipt-body > * { flex-shrink: 0; }

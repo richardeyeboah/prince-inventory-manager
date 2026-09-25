@@ -1,3 +1,4 @@
+import { loadSales } from './lib/load-sales'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from './auth'
 import { uid } from './lib/format'
@@ -6,6 +7,9 @@ import { drainOfflineQueue, enqueueOfflineSale, isOnline, pendingOfflineCount } 
 import { friendlyShopError, isJwtClockSkewError } from './lib/shop-errors'
 import { supabase } from './lib/supabase'
 import type {
+  AdjustmentInput,
+  SaleAdjustment,
+  SalesReset,
   CartLine,
   CheckoutDetails,
   CollectedPaymentMethod,
@@ -38,6 +42,9 @@ type ProductRow = {
 }
 
 type SaleRow = {
+  void_receipts?: Sale['voidReceipt']
+  reset_id?: string | null
+  adjustment_version?: number
   id: string
   receipt_number?: string
   items: Sale['items']
@@ -145,6 +152,9 @@ function saleFromRow(
   const voided = Boolean(row.voided_at)
   return {
     id: row.id,
+    voidReceipt: row.void_receipts ?? null,
+    resetId: row.reset_id ?? null,
+    adjustmentVersion: row.adjustment_version ?? 0,
     receiptNumber: row.receipt_number ?? row.id,
     items: row.items.map((item) => {
       const lineFinancial = lineFinancials?.get(`${row.id}:${item.productId}`)
@@ -293,6 +303,13 @@ function buildSale(
 }
 
 type ShopContextValue = {
+  allSales: Sale[]
+  allPayments: Payment[]
+  resets: SalesReset[]
+  resetSales: (id: string, start: string | null, end: string | null, reason: string, expectedIds: string[]) => Promise<boolean>
+  restoreReset: (id: string) => Promise<boolean>
+  adjustments: SaleAdjustment[]
+  adjustSale: (input: AdjustmentInput) => Promise<boolean>
   products: Product[]
   sales: Sale[]
   customers: Customer[]
@@ -308,7 +325,7 @@ type ShopContextValue = {
   deleteProduct: (id: string) => void
   checkout: (items: CartLine[], paymentMethod: PaymentMethod, details: CheckoutDetails) => Promise<Sale | null>
   recordPayment: (saleId: string, amount: number, method: CollectedPaymentMethod, notes?: string) => Promise<boolean>
-  voidSale: (saleId: string) => Promise<boolean>
+  voidSale: (saleId: string, reason: string, method: CollectedPaymentMethod, expectedPaid: number) => Promise<boolean>
   clearError: () => void
 }
 
@@ -316,6 +333,8 @@ const ShopContext = createContext<ShopContextValue | null>(null)
 
 export function ShopProvider({ children }: { children: ReactNode }) {
   const { session, profile, isOwner } = useAuth()
+  const [resets, setResets] = useState<SalesReset[]>([])
+  const [adjustments, setAdjustments] = useState<SaleAdjustment[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [sales, setSales] = useState<Sale[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
@@ -328,6 +347,9 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     if (!supabase || !session) return
 
     const [
+      resetRes,
+      refundRes,
+      adjustmentRes,
       productRes,
       saleRes,
       customerRes,
@@ -336,8 +358,11 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       financialRes,
       lineFinancialRes,
     ] = await Promise.all([
+      isOwner ? supabase.from('sales_resets').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
+      supabase.from('refunds').select('*'),
+      supabase.from('sale_adjustment_history').select('*').order('created_at', { ascending: false }),
       supabase.from('products').select('*').order('name'),
-      supabase.from('sales').select('*').order('created_at', { ascending: false }),
+      loadSales(),
       supabase.from('customers').select('*').order('name'),
       supabase.from('payments').select('*').order('created_at', { ascending: false }),
       isOwner ? supabase.from('product_costs').select('*') : Promise.resolve({ data: [], error: null }),
@@ -358,6 +383,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       return
     }
     if (
+      resetRes.error || refundRes.error || adjustmentRes.error ||
       customerRes.error ||
       paymentRes.error ||
       costRes.error ||
@@ -366,6 +392,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     ) {
       setError(
         friendlyShopError(
+          resetRes.error ?? refundRes.error ?? adjustmentRes.error ??
           customerRes.error ??
             paymentRes.error ??
             costRes.error ??
@@ -401,7 +428,12 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       ),
     )
     setCustomers((customerRes.data as CustomerRow[]).map(customerFromRow))
-    setPayments((paymentRes.data as PaymentRow[]).map(paymentFromRow))
+    setResets((resetRes.data ?? []) as SalesReset[])
+    setAdjustments((adjustmentRes.data ?? []) as SaleAdjustment[])
+    setPayments([
+      ...(paymentRes.data as PaymentRow[]).map(paymentFromRow),
+      ...((refundRes.data ?? []) as PaymentRow[]).map((row) => paymentFromRow({ ...row, amount: -Number(row.amount), reversed_at: null })),
+    ])
     setError(null)
     setLoading(false)
   }, [session, isOwner])
@@ -501,10 +533,38 @@ export function ShopProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ShopContextValue>(
     () => ({
+      allSales: sales,
+      allPayments: payments,
+      resets,
+      resetSales: async (id, start, end, reason, expectedIds) => {
+        if (!isOwner || !supabase || !isOnline()) { setError('Only the owner can reset sales while online.'); return false }
+        const { error: err } = await supabase.rpc('reset_sales_period', { p_id: id, p_start: start, p_end: end, p_reason: reason, p_expected_ids: expectedIds })
+        if (err) { setError(err.message); return false }
+        await refresh(); return true
+      },
+      restoreReset: async (id) => {
+        if (!isOwner || !supabase || !isOnline()) { setError('Only the owner can restore sales while online.'); return false }
+        const { error: err } = await supabase.rpc('restore_sales_reset', { p_id: id })
+        if (err) { setError(err.message); return false }
+        await refresh(); return true
+      },
+      adjustments,
+      adjustSale: async (input) => {
+        if (!session?.user || !profile || !supabase || !isOnline()) { setError('Sign in and connect to the internet to adjust a sale.'); return false }
+        const { error: err } = await supabase.rpc('adjust_sale_item', {
+          p_id: input.id, p_sale_id: input.saleId, p_version: input.version,
+          p_line_number: input.lineNumber, p_quantity: input.quantity,
+          p_unit_price: input.unitPrice, p_restock: input.restock,
+          p_reason: input.reason, p_payment_method: input.method,
+        })
+        if (err) { setError(err.message); return false }
+        await refresh()
+        return true
+      },
       products,
-      sales,
+      sales: sales.filter((sale) => !sale.resetId),
       customers,
-      payments,
+      payments: payments.filter((payment) => !sales.some((sale) => sale.id === payment.saleId && sale.resetId)),
       loading,
       error,
       offlinePending,
@@ -664,10 +724,10 @@ export function ShopProvider({ children }: { children: ReactNode }) {
         await refresh()
         return true
       },
-      voidSale: async (saleId) => {
+      voidSale: async (saleId, reason, method, expectedPaid) => {
         if (!isOwner) { setError('Only the owner can perform this action.'); return false }
         if (!supabase) return false
-        const { error: err } = await supabase.rpc('void_sale', { p_sale_id: saleId })
+        const { error: err } = await supabase.rpc('void_sale', { p_sale_id: saleId, p_reason: reason, p_payment_method: method, p_expected_paid: expectedPaid })
         if (err) {
           setError(err.message)
           return false
@@ -677,6 +737,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       },
     }),
     [
+      resets,
+      adjustments,
       products,
       sales,
       customers,
