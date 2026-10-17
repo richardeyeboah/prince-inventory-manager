@@ -15,6 +15,7 @@ vi.mock('./lib/supabase', () => ({ supabase: { rpc }, supabaseConfigured: true }
 vi.mock('./components/PwaUpdatePrompt', () => ({ PwaUpdatePrompt: () => null }))
 import App from './App'
 import { ShopProvider, useShop } from './store'
+import { DashboardView } from './components/DashboardView'
 import { SellView } from './components/SellView'
 import { SalesView } from './components/SalesView'
 import { TestJob } from './components/TestJob'
@@ -106,6 +107,19 @@ describe('worker access', () => {
     const ownerHtml = renderToStaticMarkup(<ShopProvider><SellView /></ShopProvider>)
     expect(ownerHtml).toContain('Tax included · owner only')
     expect(ownerHtml).toContain('Base amount')
+  })
+  it('shows profit figures to the owner only', () => {
+    const workerHtml = renderToStaticMarkup(<ShopProvider><DashboardView onNavigate={() => {}} /></ShopProvider>)
+    expect(workerHtml).toContain('My revenue today')
+    expect(workerHtml).not.toMatch(/profit/i)
+    expect(renderToStaticMarkup(<ShopProvider><SellView /></ShopProvider>)).not.toContain('Projected gross profit')
+    auth.isOwner = true
+    auth.profile!.role = 'owner'
+    const ownerHtml = renderToStaticMarkup(<ShopProvider><DashboardView onNavigate={() => {}} /></ShopProvider>)
+    expect(ownerHtml).toContain('Profit today')
+    expect(ownerHtml).toContain('id="profit"')
+    expect(ownerHtml).toContain('Pick month')
+    expect(renderToStaticMarkup(<ShopProvider><SellView /></ShopProvider>)).toContain('Projected gross profit')
   })
   it('offers Cash, Mobile Money and Pay later at checkout', () => {
     const html = renderToStaticMarkup(<ShopProvider><SellView /></ShopProvider>)
