@@ -125,7 +125,7 @@ export type Payment = {
   amount: number
   paymentMethod: CollectedPaymentMethod
   notes: string
-  recordedBy: string
+  recordedBy: string | null
   createdAt: string
   reversedAt: string | null
 }

@@ -36,7 +36,7 @@ export function SalesView() {
   return <div className="view sales-view">
     <header className="view-header">
       <div><p className="eyebrow">Receipt history</p><h1>Sales</h1></div>
-      {isOwner && <button type="button" className="primary-btn" onClick={() => setTestJob(true)}>Test job</button>}
+      {isOwner && <button type="button" className="primary-btn" onClick={() => setTestJob(true)}>Preview receipt</button>}
     </header>
     <label className="sales-history-filter">Receipts to show<select value={scope} onChange={(e) => setScope(e.target.value)}>
       <option value="all">All receipts, including reset history</option><option value="active">Active sales only</option><option value="history">Reset history only</option>
@@ -127,7 +127,7 @@ function SaleList({
           </div>
 
           {adjustments.filter((a) => a.sale_id === sale.id).map((a) => <p key={a.id} className="sale-worker">
-            {formatDateTime(a.created_at)} · {a.reason} · Sale {money(Number(a.before_sale.total))} → {money(Number(a.after_sale.total))} · Refunded {money(Number(a.refund_amount))} ({methodLabel[a.payment_method]}) · Restocked {a.restocked} · Recorded by {a.recorded_by}
+            {formatDateTime(a.created_at)} · {a.reason} · Sale {money(Number(a.before_sale.total))} → {money(Number(a.after_sale.total))} · Refunded {money(Number(a.refund_amount))} ({methodLabel[a.payment_method]}) · Restocked {a.restocked}
           </p>)}
           {editing === sale.id && <ReturnForm key={`${sale.id}:${sale.adjustmentVersion}`} sale={sale} onClose={() => setEditing(null)} />}
           {voiding === sale.id && <VoidForm sale={sale} onClose={() => setVoiding(null)} />}

@@ -42,11 +42,11 @@ describe('worker access', () => {
     expect(html).not.toContain('Join shop')
     expect(html).not.toContain('Create account')
   })
-  it('only offers receipt testing to the owner', () => {
-    expect(renderToStaticMarkup(<ShopProvider><SalesView /></ShopProvider>)).not.toContain('Test job')
+  it('only offers receipt previewing to the owner', () => {
+    expect(renderToStaticMarkup(<ShopProvider><SalesView /></ShopProvider>)).not.toContain('Preview receipt')
     expect(renderToStaticMarkup(<ShopProvider><TestJob onClose={() => {}} /></ShopProvider>)).toBe('')
     auth.isOwner = true; auth.profile!.role = 'owner'
-    expect(renderToStaticMarkup(<ShopProvider><SalesView /></ShopProvider>)).toContain('Test job')
+    expect(renderToStaticMarkup(<ShopProvider><SalesView /></ShopProvider>)).toContain('Preview receipt')
     expect(rpc).not.toHaveBeenCalled()
   })
   it('blocks the staff management view for workers', () => {

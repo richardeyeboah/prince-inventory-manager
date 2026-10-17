@@ -311,7 +311,7 @@ export function SellView() {
                   <button
                     type="button"
                     className="icon-btn"
-                    aria-label="Decrease"
+                    aria-label={`Decrease ${line.product.name}`}
                     onClick={() => setQty(line.productId, line.qty - 1)}
                   >
                     <Minus size={16} />
@@ -320,7 +320,7 @@ export function SellView() {
                   <button
                     type="button"
                     className="icon-btn"
-                    aria-label="Increase"
+                    aria-label={`Increase ${line.product.name}`}
                     onClick={() => setQty(line.productId, line.qty + 1)}
                     disabled={
                       !line.product.isLabor && line.qty >= line.product.stock
@@ -331,7 +331,7 @@ export function SellView() {
                   <button
                     type="button"
                     className="icon-btn danger"
-                    aria-label="Remove"
+                    aria-label={`Remove ${line.product.name}`}
                     onClick={() => setQty(line.productId, 0)}
                   >
                     <Trash2 size={16} />

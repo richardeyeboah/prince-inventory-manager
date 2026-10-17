@@ -39,7 +39,7 @@ export function ReceiptModal({ sale, onClose, testOnly = false, previewControls 
         aria-labelledby="receipt-title"
       >
         <div className="modal-head no-print">
-          <h2 id="receipt-title">{testOnly ? 'Test job' : title}</h2>
+          <h2 id="receipt-title">{testOnly ? 'Receipt preview' : title}</h2>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close">
             <X size={18} />
           </button>

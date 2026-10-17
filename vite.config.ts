@@ -6,7 +6,9 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      // New releases install and take over on the next check without the user having to tap anything,
+      // so the shop is never stuck on an old build. The in-app banner still offers an instant refresh.
+      registerType: 'autoUpdate',
       injectRegister: null,
       includeAssets: [
         'favicon.svg',
@@ -47,6 +49,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,svg,png,jpeg,woff2}'],
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
       },
     }),
   ],

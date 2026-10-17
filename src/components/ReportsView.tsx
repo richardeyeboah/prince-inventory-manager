@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { Download } from 'lucide-react'
-import { money, todayKey } from '../lib/format'
+import { money } from '../lib/format'
+import { shiftDay } from '../lib/profit'
+import { shopDayKey } from '../lib/sales-calendar'
 import { useShop } from '../store'
-
-const DAY_MS = 24 * 60 * 60 * 1000
 
 type Range = 'today' | '7d' | '30d' | 'month' | 'year' | 'all'
 
@@ -24,22 +24,16 @@ export function ReportsView() {
 
   const report = useMemo(() => {
     const active = sales.filter((s) => !s.voidedAt)
-    const now = Date.now()
-
+    // Ranges follow Ghana shop days so Reports agree with the Sales calendar and dashboard.
+    const today = shopDayKey()
     const isInRange = (iso: string) => {
       if (range === 'all') return true
-      const date = new Date(iso)
-      if (range === 'today') return todayKey(date) === todayKey()
-      const current = new Date()
-      if (range === 'month') {
-        return (
-          date.getFullYear() === current.getFullYear() &&
-          date.getMonth() === current.getMonth()
-        )
-      }
-      if (range === 'year') return date.getFullYear() === current.getFullYear()
+      const day = shopDayKey(iso)
+      if (range === 'today') return day === today
+      if (range === 'month') return day.slice(0, 7) === today.slice(0, 7)
+      if (range === 'year') return day.slice(0, 4) === today.slice(0, 4)
       const days = range === '7d' ? 7 : 30
-      return date.getTime() >= now - days * DAY_MS
+      return day >= shiftDay(today, -(days - 1)) && day <= today
     }
 
     const inRange = active.filter((sale) => isInRange(sale.createdAt))
@@ -84,7 +78,7 @@ export function ReportsView() {
     const byItem = new Map<string, { qty: number; revenue: number; profit: number }>()
     const byDay = new Map<string, { count: number; sales: number; tax: number; profit: number }>()
     for (const s of inRange) {
-      const day = todayKey(new Date(s.createdAt))
+      const day = shopDayKey(s.createdAt)
       const daily = byDay.get(day) ?? { count: 0, sales: 0, tax: 0, profit: 0 }
       daily.count += 1
       daily.sales += s.total
@@ -151,7 +145,7 @@ export function ReportsView() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `prince-auto-sales-${range}-${todayKey()}.csv`
+    a.download = `prince-auto-sales-${range}-${shopDayKey()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -162,7 +156,7 @@ export function ReportsView() {
         <div>
           <p className="eyebrow">Numbers</p>
           <h1>Reports</h1>
-          <p>Sales reflect returns and corrections on the original sale date. Collected includes refunds on the day recorded.</p>
+          <p className="page-description">Sales reflect returns and corrections on the original sale date. Collected includes refunds on the day recorded.</p>
         </div>
         {isOwner && report.inRange.length > 0 && (
           <button type="button" className="primary-btn" onClick={exportCsv}>
@@ -204,13 +198,13 @@ export function ReportsView() {
           <>
             <div className="kpi-card">
               <div className="kpi-body">
-                <span className="kpi-label">Gross profit</span>
+                <span className="kpi-label">Gross profit{report.revenue > 0 ? ` · ${Math.round(report.profit / report.revenue * 100)}% of sales` : ''}</span>
                 <strong className="kpi-value">{money(report.profit)}</strong>
               </div>
             </div>
             <div className="kpi-card">
               <div className="kpi-body">
-                <span className="kpi-label">COGS</span>
+                <span className="kpi-label">Cost of parts sold</span>
                 <strong className="kpi-value">{money(report.cost)}</strong>
               </div>
             </div>
@@ -344,7 +338,7 @@ export function ReportsView() {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th className="num">Sales</th>
+                  <th className="num">Receipts</th>
                   <th className="num">Sales</th>
                   <th className="num">Tax</th>
                   {isOwner && <th className="num">Profit</th>}

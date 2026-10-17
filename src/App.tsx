@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { InstallPrompt } from './components/InstallPrompt'
 import { shouldShowInstallPrompt } from './lib/pwa'
 import {
@@ -28,6 +28,14 @@ import { StockView } from './components/StockView'
 import { ShopProvider, useShop } from './store'
 
 type Tab = 'dashboard' | 'sell' | 'stock' | 'sales' | 'credit' | 'reports' | 'more' | 'team'
+const tabs = new Set<Tab>(['dashboard', 'sell', 'stock', 'sales', 'credit', 'reports', 'more', 'team'])
+const workerTabs: Tab[] = ['dashboard', 'sell', 'credit', 'sales']
+
+function tabFromUrl(): Tab {
+  if (typeof window === 'undefined') return 'dashboard'
+  const value = window.location.hash.slice(1)
+  return tabs.has(value as Tab) ? value as Tab : 'dashboard'
+}
 
 const desktopNavItems: { id: Tab; label: string; icon: typeof Wrench }[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -49,13 +57,40 @@ const mobileNavItems: { id: Tab; label: string; icon: typeof Wrench }[] = [
 ]
 
 function Shell() {
-  const [requestedTab, setTab] = useState<Tab>('dashboard')
+  const [requestedTab, setRequestedTab] = useState<Tab>(tabFromUrl)
   const { profile, signOut, isOwner } = useAuth()
-  const workerTabs: Tab[] = ['dashboard', 'sell', 'credit', 'sales']
   const tab = isOwner || workerTabs.includes(requestedTab) ? requestedTab : 'dashboard'
   const mobileTab = tab === 'reports' || tab === 'team' ? 'more' : tab
   const [showInstall, setShowInstall] = useState(shouldShowInstallPrompt)
   const { loading, error, offlinePending, clearError } = useShop()
+
+  const navigate = useCallback((next: Tab) => {
+    if (next === tab) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    window.history.pushState(null, '', `#${next}`)
+    setRequestedTab(next)
+  }, [tab])
+
+  useEffect(() => {
+    if (!window.location.hash) window.history.replaceState(null, '', '#dashboard')
+    const followHistory = () => setRequestedTab(tabFromUrl())
+    window.addEventListener('popstate', followHistory)
+    window.addEventListener('hashchange', followHistory)
+    return () => {
+      window.removeEventListener('popstate', followHistory)
+      window.removeEventListener('hashchange', followHistory)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!isOwner && !workerTabs.includes(requestedTab)) {
+      window.history.replaceState(null, '', '#dashboard')
+      return
+    }
+    window.scrollTo({ top: 0 })
+  }, [isOwner, requestedTab])
 
   return (
     <div className="app-frame">
@@ -72,7 +107,7 @@ function Shell() {
               key={id}
               type="button"
               className={`side-link ${tab === id ? 'active' : ''}`}
-              onClick={() => setTab(id)}
+              onClick={() => navigate(id)}
               aria-current={tab === id ? 'page' : undefined}
             >
               <Icon size={19} aria-hidden />
@@ -147,14 +182,14 @@ function Shell() {
             </div>
           ) : (
             <>
-              {tab === 'dashboard' && <DashboardView onNavigate={setTab} />}
+              {tab === 'dashboard' && <DashboardView onNavigate={navigate} />}
               {tab === 'sell' && <SellView />}
               {tab === 'stock' && <StockView />}
               {tab === 'sales' && <SalesView />}
               {tab === 'credit' && <CreditView />}
               {tab === 'reports' && <ReportsView />}
               {tab === 'team' && isOwner && <TeamView />}
-              {tab === 'more' && <MoreView onNavigate={setTab} />}
+              {tab === 'more' && <MoreView onNavigate={navigate} />}
             </>
           )}
         </main>
@@ -165,7 +200,7 @@ function Shell() {
               key={id}
               type="button"
               className={`tab ${mobileTab === id ? 'active' : ''}`}
-              onClick={() => setTab(id)}
+              onClick={() => navigate(id)}
               aria-current={mobileTab === id ? 'page' : undefined}
             >
               <Icon size={20} aria-hidden />

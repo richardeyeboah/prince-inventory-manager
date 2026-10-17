@@ -1,5 +1,6 @@
 import { loadSales } from './lib/load-sales'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { empty, fetchAll } from './lib/fetch-all'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useAuth } from './auth'
 import { uid } from './lib/format'
 import { calculateLine, calculateSaleTotals } from './lib/finance'
@@ -42,7 +43,7 @@ type ProductRow = {
 }
 
 type SaleRow = {
-  void_receipts?: Sale['voidReceipt']
+  void_receipts?: Sale['voidReceipt'] | Sale['voidReceipt'][]
   reset_id?: string | null
   adjustment_version?: number
   id: string
@@ -93,7 +94,7 @@ type PaymentRow = {
   amount: number | string
   payment_method: CollectedPaymentMethod
   notes: string
-  recorded_by: string
+  recorded_by: string | null
   created_at: string
   reversed_at: string | null
 }
@@ -150,9 +151,12 @@ function saleFromRow(
   const subtotal = Number(row.subtotal ?? total)
   const amountPaid = Number(row.amount_paid ?? total)
   const voided = Boolean(row.voided_at)
+  const voidReceipt = Array.isArray(row.void_receipts)
+    ? row.void_receipts[0] ?? null
+    : row.void_receipts ?? null
   return {
     id: row.id,
-    voidReceipt: row.void_receipts ?? null,
+    voidReceipt,
     resetId: row.reset_id ?? null,
     adjustmentVersion: row.adjustment_version ?? 0,
     receiptNumber: row.receipt_number ?? row.id,
@@ -342,9 +346,12 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [offlinePending, setOfflinePending] = useState(0)
+  // Tracks which user already has data on screen so background refreshes don't flash the full-page loader.
+  const loadedFor = useRef<string | null>(null)
 
   const refresh = useCallback(async () => {
     if (!supabase || !session) return
+    const client = supabase
 
     const [
       resetRes,
@@ -358,18 +365,18 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       financialRes,
       lineFinancialRes,
     ] = await Promise.all([
-      isOwner ? supabase.from('sales_resets').select('*').order('created_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
-      supabase.from('refunds').select('*'),
-      supabase.from('sale_adjustment_history').select('*').order('created_at', { ascending: false }),
-      supabase.from('products').select('*').order('name'),
+      isOwner ? fetchAll<SalesReset>(() => client.from('sales_resets').select('*').order('created_at', { ascending: false }).order('id')) : empty<SalesReset>(),
+      fetchAll<PaymentRow>(() => client.from('refunds').select('*').order('created_at', { ascending: false }).order('id')),
+      fetchAll<SaleAdjustment>(() => client.from('sale_adjustment_history').select('*').order('created_at', { ascending: false }).order('id')),
+      fetchAll<ProductRow>(() => client.from('products').select('*').order('name').order('id')),
       loadSales(),
-      supabase.from('customers').select('*').order('name'),
-      supabase.from('payments').select('*').order('created_at', { ascending: false }),
-      isOwner ? supabase.from('product_costs').select('*') : Promise.resolve({ data: [], error: null }),
-      isOwner ? supabase.from('sale_financials').select('*') : Promise.resolve({ data: [], error: null }),
+      fetchAll<CustomerRow>(() => client.from('customers').select('*').order('name').order('id')),
+      fetchAll<PaymentRow>(() => client.from('payments').select('*').order('created_at', { ascending: false }).order('id')),
+      isOwner ? fetchAll<ProductCostRow>(() => client.from('product_costs').select('*').order('product_id')) : empty<ProductCostRow>(),
+      isOwner ? fetchAll<SaleFinancialRow>(() => client.from('sale_financials').select('*').order('sale_id')) : empty<SaleFinancialRow>(),
       isOwner
-        ? supabase.from('sale_items').select('sale_id,product_id,line_cost,gross_profit')
-        : Promise.resolve({ data: [], error: null }),
+        ? fetchAll<SaleItemFinancialRow>(() => client.from('sale_items').select('sale_id,product_id,line_cost,gross_profit').order('sale_id').order('id'))
+        : empty<SaleItemFinancialRow>(),
     ])
 
     if (productRes.error) {
@@ -435,6 +442,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       ...((refundRes.data ?? []) as PaymentRow[]).map((row) => paymentFromRow({ ...row, amount: -Number(row.amount), reversed_at: null })),
     ])
     setError(null)
+    loadedFor.current = session.user.id
     setLoading(false)
   }, [session, isOwner])
 
@@ -502,11 +510,12 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       setSales([])
       setCustomers([])
       setPayments([])
+      loadedFor.current = null
       setLoading(false)
       return
     }
 
-    setLoading(true)
+    if (loadedFor.current !== session.user.id) setLoading(true)
     setOfflinePending(pendingOfflineCount())
     void refresh()
     void syncOffline()

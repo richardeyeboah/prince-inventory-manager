@@ -58,10 +58,17 @@ export function StockView() {
   const [draft, setDraft] = useState<Draft>(emptyDraft)
   const [open, setOpen] = useState(false)
   const summary = useMemo(() => summarizeInventory(products), [products])
+  const missingCost = useMemo(() => products.filter((p) => !p.isLabor && p.costPrice <= 0).length, [products])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const list = products.filter((p) => stockFilter === 'all' || (stockFilter === 'low' ? !p.isLabor && p.stock > 0 && p.stock <= p.lowStockAt : !p.isLabor && p.stock === 0)).sort((a, b) => {
+    const matches = (p: Product) => {
+      if (stockFilter === 'low') return !p.isLabor && p.stock > 0 && p.stock <= p.lowStockAt
+      if (stockFilter === 'out') return !p.isLabor && p.stock === 0
+      if (stockFilter === 'nocost') return !p.isLabor && p.costPrice <= 0
+      return true
+    }
+    const list = products.filter(matches).sort((a, b) => {
       const aLow = a.stock <= a.lowStockAt ? 0 : 1
       const bLow = b.stock <= b.lowStockAt ? 0 : 1
       if (aLow !== bLow) return aLow - bLow
@@ -224,6 +231,9 @@ export function StockView() {
             <button type="button" className={`inventory-stat ${summary.outOfStock ? 'needs-attention' : ''} ${stockFilter === 'out' ? 'is-selected' : ''}`} onClick={() => setStockFilter('out')}>
               <span>Out of stock</span><strong>{summary.outOfStock}</strong><small>Tap to review</small>
             </button>
+            <button type="button" className={`inventory-stat ${missingCost ? 'needs-attention' : ''} ${stockFilter === 'nocost' ? 'is-selected' : ''}`} onClick={() => setStockFilter('nocost')}>
+              <span>No cost price</span><strong>{missingCost}</strong><small>{missingCost ? 'Profit overstated until set' : 'All parts have a cost'}</small>
+            </button>
           </div>
         </section>
       )}
@@ -239,8 +249,8 @@ export function StockView() {
         />
       </div>
       <div className="inventory-filters" aria-label="Filter inventory">
-        {(['all', 'low', 'out'] as const).map((filter) => <button key={filter} type="button" aria-pressed={stockFilter === filter} onClick={() => setStockFilter(filter)}>
-          {filter === 'all' ? `All products (${products.length})` : filter === 'low' ? 'Low stock' : 'Out of stock'}
+        {([...(['all', 'low', 'out'] as const), ...(isOwner ? (['nocost'] as const) : [])]).map((filter) => <button key={filter} type="button" aria-pressed={stockFilter === filter} onClick={() => setStockFilter(filter)}>
+          {filter === 'all' ? `All products (${products.length})` : filter === 'low' ? 'Low stock' : filter === 'out' ? 'Out of stock' : `No cost price${missingCost ? ` (${missingCost})` : ''}`}
         </button>)}
       </div>
       </div>
@@ -257,6 +267,7 @@ export function StockView() {
                 <div className="product-price-line"><strong>{money(finalCustomerPrice(product))}</strong><span>{product.sku}</span></div>
                 <div className="product-tags">
                   {low && <span className="stock-warning">{out ? 'Out of stock' : 'Low stock'}</span>}
+                  {isOwner && !isLabor && product.costPrice <= 0 && <span className="stock-warning cost-missing">No cost price</span>}
                 </div>
                 <span className="meta product-financials">
                   {isOwner && <>Cost {money(product.costPrice)} · Profit {money(finalCustomerPrice(product) - product.costPrice)} · </>}
@@ -409,6 +420,9 @@ export function StockView() {
               </div>
               {(Number(draft.price) || 0) * (draft.taxable ? 1 + (Number(draft.taxRate) || 0) / 100 : 1) < Number(draft.costPrice) && (
                 <p className="field-warning">Warning: selling price is below cost.</p>
+              )}
+              {!draft.isLabor && (Number(draft.costPrice) || 0) <= 0 && (Number(draft.price) || 0) > 0 && (
+                <p className="field-warning">No cost price entered: the whole selling price will be counted as profit for this part.</p>
               )}
               <h3 className="form-section-title">Stock alerts &amp; codes</h3>
               <div className="form-row">
