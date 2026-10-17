@@ -97,7 +97,7 @@ export function CreditView() {
     <div className="view credit-view">
       <header className="view-header">
         <div>
-          <p className="eyebrow">Accounts receivable</p>
+          <p className="eyebrow">Credit sales &amp; payments</p>
           <h1>Customer balances</h1>
         </div>
       </header>

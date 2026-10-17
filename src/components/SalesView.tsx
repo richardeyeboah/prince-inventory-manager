@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Printer, RotateCcw } from 'lucide-react'
 import { formatDateTime, money } from '../lib/format'
 import { useShop } from '../store'
+import { useAuth } from '../auth'
 import type { Sale } from '../types'
 import { SalesCalendar } from './SalesCalendar'
 import { TestJob } from './TestJob'
@@ -20,11 +21,20 @@ const methodLabel = {
 
 export function SalesView() {
   const { allSales, isOwner } = useShop()
-  const [scope, setScope] = useState('all')
+  const { profile } = useAuth()
+  // Owners browse every receipt; workers start with their own so the day's total matches their dashboard.
+  const [scope, setScope] = useState(isOwner ? 'all' : 'mine')
   const [selected, setSelected] = useState(() => shopDayKey())
   const [receipt, setReceipt] = useState<Sale | null>(null)
   const [testJob, setTestJob] = useState(false)
-  const sales = useMemo(() => allSales.filter((sale) => scope === 'all' || (scope === 'history' ? Boolean(sale.resetId) : !sale.resetId)), [allSales, scope])
+  const sales = useMemo(() => allSales.filter((sale) => {
+    if (scope === 'mine') return sale.workerId === profile?.id && !sale.resetId
+    if (scope === 'history') return Boolean(sale.resetId)
+    if (scope === 'active') return !sale.resetId
+    return true
+  }), [allSales, scope, profile?.id])
+  // Shop-wide money totals stay with the owner; a worker looking up a colleague's receipt sees counts only.
+  const showDayTotal = isOwner || scope === 'mine'
   const counts = useMemo(() => {
     const result = new Map<string, number>()
     for (const sale of sales) { const day = shopDayKey(sale.createdAt); result.set(day, (result.get(day) ?? 0) + 1) }
@@ -39,14 +49,16 @@ export function SalesView() {
       {isOwner && <button type="button" className="primary-btn" onClick={() => setTestJob(true)}>Preview receipt</button>}
     </header>
     <label className="sales-history-filter">Receipts to show<select value={scope} onChange={(e) => setScope(e.target.value)}>
-      <option value="all">All receipts, including reset history</option><option value="active">Active sales only</option><option value="history">Reset history only</option>
+      {isOwner
+        ? <><option value="all">All receipts, including reset history</option><option value="active">Active sales only</option><option value="history">Reset history only</option></>
+        : <><option value="mine">My receipts</option><option value="active">All shop receipts (to find or reprint one)</option></>}
     </select></label>
     <SalesCalendar selected={selected} counts={counts} onSelect={setSelected} />
     <section className="sales-section" aria-label="Selected day's sales">
       <h2>{dayLabel(selected)}</h2>
       <div className="daily-sales-summary" aria-live="polite">
-        <span><strong>{daily.length}</strong> receipts</span>
-        <span><strong>{money(completed.reduce((sum, sale) => sum + sale.total, 0))}</strong> sales after returns</span>
+        <span><strong>{daily.length}</strong> {scope === 'mine' ? 'of my receipts' : 'receipts'}</span>
+        {showDayTotal && <span><strong>{money(completed.reduce((sum, sale) => sum + sale.total, 0))}</strong> {scope === 'mine' ? 'my sales after returns' : 'sales after returns'}</span>}
         <span><strong>{voided.length}</strong> voided</span>
       </div>
       {scope !== 'active' && daily.some((sale) => sale.resetId) && <p className="calendar-hint">Includes archived sales from a totals reset. Opening them does not restore them to active totals.</p>}
@@ -120,8 +132,11 @@ function SaleList({
           </ul>
 
           <div className="sale-summary">
-            <span>Subtotal {money(sale.subtotal)}</span>
-            <span>Tax {money(sale.taxTotal)}</span>
+            {isOwner && <>
+              <span>Subtotal {money(sale.subtotal)}</span>
+              <span>Tax {money(sale.taxTotal)}</span>
+            </>}
+            {!isOwner && sale.amountPaid > 0 && sale.balanceDue > 0 && <span>Paid {money(sale.amountPaid)}</span>}
             {sale.balanceDue > 0 && <strong>Balance {money(sale.balanceDue)}</strong>}
             {isOwner && <strong>Profit {money(sale.grossProfit)}</strong>}
           </div>
